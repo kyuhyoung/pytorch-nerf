@@ -19,6 +19,7 @@ If you prefer your code more object-oriented, check out [`run_nerf_alt.py`](run_
 A Colab notebook for the full model can be found [here](https://colab.research.google.com/drive/1oRnnlF-2YqCDIzoc-uShQm8_yymLKiqr?usp=sharing), while a notebook for the tiny model can be found [here](https://colab.research.google.com/drive/1ntlbzQ121-E1BSa5EKvAyai6SMG4cylj?usp=sharing).
 The [`generate_nerf_dataset.py`](generate_nerf_dataset.py) script was used to generate the training data of the ShapeNet car (see "[Generating the ShapeNet datasets](#generating-the-shapenet-datasets)" for additional details).
 
+
 For the following test view:
 
 ![](test_view.png)
