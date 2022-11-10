@@ -1,0 +1,32 @@
+FROM ubuntu:20.04
+#FROM nvidia/cuda:11.1-base
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt update -y && apt upgrade -y
+RUN apt install software-properties-common -y
+RUN add-apt-repository ppa:deadsnakes/ppa -y
+RUN apt update -y
+RUN apt install python3.8 -y
+RUN python3.8 --version
+RUN apt install fish gedit -y
+RUN python3.8 --version
+RUN python3 --version
+#RUN python3.8 -m pip install --upgrade pip
+RUN apt-get remove python3-pip
+RUN apt-get install python3-pip -y
+RUN pip3 install torch==1.12.1+cu113 torchvision==0.13.1+cu113 -f https://download.pytorch.org/whl/torch_stable.html
+RUN apt install wget git -y
+ENV TCNN_CUDA_ARCHITECTURES=86
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+RUN wget https://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda-repo-ubuntu2004-11-3-local_11.3.1-465.19.01-1_amd64.deb && dpkg -i cuda-repo-ubuntu2004-11-3-local_11.3.1-465.19.01-1_amd64.deb
+RUN apt-key add /var/cuda-repo-ubuntu2004-11-3-local/7fa2af80.pub
+RUN pip install matplotlib
+RUN apt-get install -y aptitude
+RUN aptitude install -y texlive-fonts-recommended texlive-fonts-extra
+RUN apt-get install -y dvipng
+RUN apt-get install -y cm-super
+#RUN apt-get update && apt-get -y install cuda
+#RUN echo "CUDA_HOME : ${CUDA_HOME}"
+#RUN pip3 install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
+CMD ["fish"]
+
+

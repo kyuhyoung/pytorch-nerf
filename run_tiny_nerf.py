@@ -1,8 +1,16 @@
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import math, sys
+from time import sleep
 
 from torch import nn, optim
+
+matplotlib.rc('text', usetex=True) #use latex for text
+# add amsmath to the preamble
+#matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+matplotlib.rcParams['text.latex.preamble'] = r"\usepackage{amsmath}"
 
 
 def get_coarse_query_points(ds, N_c, t_i_c_bin_edges, t_i_c_gap, os):
@@ -100,6 +108,21 @@ def main():
     seed = 9458
     torch.manual_seed(seed)
     np.random.seed(seed)
+    '''
+    num_iters = 20000
+    display_every = 100
+    '''
+    num_iters = 200000
+    display_every = 1000
+
+
+    #num_iters = 20
+    #display_every = 3
+
+    i_last_display = int(num_iters / display_every) * display_every
+    #print(f'num_iters : {num_iters}, display_every : {display_every}, i_last_display : {i_last_display}');  exit(0)
+
+
 
     device = "cuda:0"
     F_c = VeryTinyNeRFMLP().to(device)
@@ -112,25 +135,64 @@ def main():
     data_f = "66bdbc812bd0a196e194052f3f12cb2e.npz"
     data = np.load(data_f)
 
+    #for key, val in data.items():
+    #    print(f'key : {key}')       #   images, poses, focal, camera_distance
+    #exit(0)                  #   98.209
+
     images = data["images"] / 255
-    img_size = images.shape[1]
+    n_im_total = len(images)
+    #print(f'n_im_total : {n_im_total}'); exit(0)       #   800
+    #print(f'images.shape : {images.shape}'); exit(0)   #   (800, 100, 100, 3)
+    img_size = images.shape[1]                          #   100
     xs = torch.arange(img_size) - (img_size / 2 - 0.5)
     ys = torch.arange(img_size) - (img_size / 2 - 0.5)
     (xs, ys) = torch.meshgrid(xs, -ys, indexing="xy")
     focal = float(data["focal"])
+#   print(f'focal : {focal}'); exit(0)                  #   98.209
+    #print(f"data['camera_distance'] : {data['camera_distance']}"); exit(0)          #2.25    
     pixel_coords = torch.stack([xs, ys, torch.full_like(xs, -focal)], dim=-1)
     camera_coords = pixel_coords / focal
     init_ds = camera_coords.to(device)
-    init_o = torch.Tensor(np.array([0, 0, float(data["camera_distance"])])).to(device)
+    cam_dist = float(data["camera_distance"])
+    init_o = torch.Tensor(np.array([0, 0, cam_dist])).to(device)
+    #init_o = torch.Tensor(np.array([0, 0, float(data["camera_distance"])])).to(device)
 
     test_idx = 150
-    plt.imshow(images[test_idx])
-    plt.show()
+    '''
+    plt.imshow(images[test_idx]);    plt.show()
+    '''
+
     test_img = torch.Tensor(images[test_idx]).to(device)
     poses = data["poses"]
     test_R = torch.Tensor(poses[test_idx, :3, :3]).to(device)
     test_ds = torch.einsum("ij,hwj->hwi", test_R, init_ds)
     test_os = (test_R @ init_o).expand(test_ds.shape)
+
+    #print(f'poses.shape : {poses.shape}');  exit(0)     #   (800, 4, 4)
+    #'''
+    n_im = min(20, n_im_total)
+    for iI in range(n_im):
+        #print(f'iI : {iI} / {n_im_total}')
+        #print(f'poses[iI] : {poses[iI]}')
+        translation_norm = math.sqrt(poses[iI, 0, 3] * poses[iI, 0, 3] + poses[iI, 1, 3] * poses[iI, 1, 3] + poses[iI, 2, 3] * poses[iI, 2, 3]) 
+        plt.title(f'iI : {iI} / {n_im}')
+        plt.imshow(images[iI]); 
+        plt.text(1, 31,
+        r'\['
+        r'\begin{bmatrix}' 
+        r'' + '{:.2f}'.format(poses[iI, 0, 0]) + '&' + '{:.2f}'.format(poses[iI, 0, 1]) + '&' + '{:.2f}'.format(poses[iI, 0, 2]) + '&' + '{:.2f}'.format(poses[iI, 0, 3]) + r'\\'
+        r'' + '{:.2f}'.format(poses[iI, 1, 0]) + '&' + '{:.2f}'.format(poses[iI, 1, 1]) + '&' + '{:.2f}'.format(poses[iI, 1, 2]) + '&' + '{:.2f}'.format(poses[iI, 1, 3]) + r'\\'
+        r'' + '{:.2f}'.format(poses[iI, 2, 0]) + '&' + '{:.2f}'.format(poses[iI, 2, 1]) + '&' + '{:.2f}'.format(poses[iI, 2, 2]) + '&' + '{:.2f}'.format(poses[iI, 2, 3]) + r'\\'
+        r'' + '{:.2f}'.format(poses[iI, 3, 0]) + '&' + '{:.2f}'.format(poses[iI, 3, 1]) + '&' + '{:.2f}'.format(poses[iI, 3, 2]) + '&' + '{:.2f}'.format(poses[iI, 3, 3]) + 
+        r'\end{bmatrix}' 
+        r'\]' + '\ncamera_distance : {}'.format(cam_dist) + '\ntranslation_norm : {:.2f}'.format(translation_norm)        
+        , size = 12)
+        plt.pause(0.05)
+        sys.stdout.write('{} / {}\r'.format(iI, n_im));  sys.stdout.flush();
+        if n_im - 1 != iI:
+            plt.clf()
+    #plt.show()
+    #'''
 
     t_n = 1.0
     t_f = 4.0
@@ -138,14 +200,17 @@ def main():
     t_i_c_gap = (t_f - t_n) / N_c
     t_i_c_bin_edges = (t_n + torch.arange(N_c) * t_i_c_gap).to(device)
 
-    train_idxs = np.arange(len(images)) != test_idx
+    #train_idxs = np.arange(len(images)) != test_idx
+    train_idxs = np.arange(n_im_total) != test_idx
     images = torch.Tensor(images[train_idxs])
     poses = torch.Tensor(poses[train_idxs])
     psnrs = []
+    losses = []
     iternums = []
-    num_iters = 20000
-    display_every = 100
+
+
     F_c.train()
+    plt.figure(figsize=(10, 4))
     for i in range(num_iters):
         target_img_idx = np.random.randint(images.shape[0])
         target_pose = poses[target_img_idx].to(device)
@@ -174,20 +239,25 @@ def main():
             psnr = -10.0 * torch.log10(loss)
 
             psnrs.append(psnr.item())
+            losses.append(loss.item())
             iternums.append(i)
 
-            plt.figure(figsize=(10, 4))
+            #plt.figure(figsize=(10, 4))
             plt.subplot(121)
             plt.imshow(C_rs_c.detach().cpu().numpy())
-            plt.title(f"Iteration {i}")
+            plt.title(f"Iteration {i} / {num_iters}")
             plt.subplot(122)
             plt.plot(iternums, psnrs)
             plt.title("PSNR")
-            plt.show()
+            plt.pause(0.05)
+            if i_last_display != i:
+                plt.clf()
+            #plt.show()
 
             F_c.train()
 
     print("Done!")
+    plt.show()
 
 
 if __name__ == "__main__":
